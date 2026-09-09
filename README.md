@@ -6,8 +6,8 @@ classifier on a two-dimensional synthetic data set.
 ## Run locally
 
 ```bash
-python -m pip install -r requirements.txt
-streamlit run app.py
+uv sync
+uv run streamlit run app.py
 ```
 
 ## Controls
