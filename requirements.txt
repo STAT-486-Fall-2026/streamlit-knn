@@ -1,0 +1,4 @@
+matplotlib
+numpy
+scikit-learn
+streamlit>=1.63.0

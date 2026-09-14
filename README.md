@@ -3,11 +3,25 @@
 This small app visualizes the decision regions of a k-nearest-neighbors (k-NN)
 classifier on a two-dimensional synthetic data set.
 
-## Run locally
+## Set up with Conda
+
+Create the environment and install the Python requirements:
 
 ```bash
-uv sync
-uv run streamlit run app.py
+conda env create -f environment.yml
+conda activate streamlit-knn
+```
+
+Run the app:
+
+```bash
+streamlit run app.py
+```
+
+If the environment already exists, update it with:
+
+```bash
+conda env update -f environment.yml --prune
 ```
 
 ## Controls
