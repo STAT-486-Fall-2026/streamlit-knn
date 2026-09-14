@@ -108,6 +108,7 @@ def plot_decision_boundary(
     y_train: np.ndarray,
     X_test: np.ndarray,
     y_test: np.ndarray,
+    test_predictions: np.ndarray,
     model: KNeighborsClassifier,
 ) -> plt.Figure:
     """Plot predicted regions, training points, and held-out test points."""
@@ -168,6 +169,19 @@ def plot_decision_boundary(
             linewidths=0.8,
             label=f"Class {class_value} test",
             zorder=3,
+        )
+
+    misclassified = test_predictions != y_test
+    if np.any(misclassified):
+        ax.scatter(
+            X_test[misclassified, 0],
+            X_test[misclassified, 1],
+            s=110,
+            marker="x",
+            c="#D55E00",
+            linewidths=2.2,
+            label="Misclassified test",
+            zorder=5,
         )
 
     ax.set_xlabel("Feature 1")
@@ -242,25 +256,35 @@ model = KNeighborsClassifier(
     **DISTANCE_METRICS[distance_name],
 )
 model.fit(X_train, y_train)
+test_predictions = model.predict(X_test)
+test_accuracy = np.mean(test_predictions == y_test)
 
 plot_column, summary_column = st.columns([3.2, 1])
 
 with plot_column:
-    figure = plot_decision_boundary(X_train, y_train, X_test, y_test, model)
+    figure = plot_decision_boundary(
+        X_train,
+        y_train,
+        X_test,
+        y_test,
+        test_predictions,
+        model,
+    )
     st.pyplot(figure, clear_figure=True, width="stretch")
 
 with summary_column:
     st.subheader("Current model")
     st.metric("k", k)
     st.metric("Training accuracy", f"{model.score(X_train, y_train):.1%}")
-    st.metric("Test accuracy", f"{model.score(X_test, y_test):.1%}")
+    st.metric("Test accuracy", f"{test_accuracy:.1%}")
     st.write(f"**Voting:** {'distance-weighted' if weighted else 'uniform'}")
     st.write(f"**Distance:** {distance_name}")
     st.write(f"**Features:** {'standardized' if standardize else 'original scale'}")
     st.info(
         "The colored background shows the class predicted at each location. "
         "The dark curve is the approximate decision boundary. Triangles are "
-        "held-out test points; circles are training points."
+        "held-out test points; circles are training points. Red x marks "
+        "indicate misclassified test points."
     )
 
 st.caption(

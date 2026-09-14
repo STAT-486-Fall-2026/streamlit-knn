@@ -38,4 +38,5 @@ two-dimensional choices:
   choice. Leave standardization off because it changes the angular geometry.
 
 The plot uses circles for training observations and triangles for held-out test
-observations. Both training and test accuracy are reported.
+observations. Misclassified test observations are overlaid with a red x. Both
+training and test accuracy are reported.
