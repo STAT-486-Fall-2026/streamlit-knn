@@ -16,4 +16,26 @@ uv run streamlit run app.py
 - **Distance-weighted voting** switches between uniform voting and giving closer
   neighbors more influence.
 - **Distance metric** compares Euclidean, Manhattan, Chebyshev, and a
-  Minkowski distance with `p = 3`.
+  Minkowski distance with `p = 3`, plus Cosine distance.
+- **Standardize features** centers each feature and scales it to unit variance
+  before fitting, which is useful when features have different measurement
+  scales.
+- The plot shows training observations as circles and held-out test
+  observations as triangles; both training and test accuracy are reported.
+
+## Available datasets
+
+The app keeps **Moons** as the default and provides three other reproducible
+two-dimensional choices:
+
+- **Concentric circles**: nested nonlinear classes that test radial geometry.
+- **Anisotropic blobs**: stretched and rotated clusters that expose scale and
+  axis-orientation effects.
+- **Linear separation**: mostly linearly separated classes with a small amount
+  of noise, useful as a simple baseline.
+- **Directional rays**: classes are separated by a small angle while radius
+  varies across several orders of magnitude, making Cosine distance a natural
+  choice. Leave standardization off because it changes the angular geometry.
+
+The plot uses circles for training observations and triangles for held-out test
+observations. Both training and test accuracy are reported.

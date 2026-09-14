@@ -3,8 +3,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import streamlit as st
-from sklearn.datasets import make_moons
+from sklearn.datasets import make_blobs, make_classification, make_circles, make_moons
+from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.preprocessing import StandardScaler
 
 
 st.set_page_config(
@@ -14,11 +16,79 @@ st.set_page_config(
 )
 
 
-@st.cache_data
-def make_demo_data() -> tuple[np.ndarray, np.ndarray]:
-    """Create a reproducible, mildly noisy two-class data set."""
+DATASET_DESCRIPTIONS = {
+    "Moons": "Two interleaving half-circles; a nonlinear neighborhood problem.",
+    "Concentric circles": "Nested circles; tests nonlinear boundaries and radial geometry.",
+    "Anisotropic blobs": "Stretched and rotated blobs; emphasizes axis and scale effects.",
+    "Linear separation": "Mostly linearly separated classes with a small amount of noise.",
+    "Directional rays": "Classes differ by angle while radius is noise; ideal for Cosine distance.",
+}
 
-    return make_moons(n_samples=220, noise=0.22, random_state=12)
+
+@st.cache_data
+def make_demo_data(
+    dataset_name: str,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Create a selected reproducible data set with a held-out test split."""
+
+    if dataset_name == "Moons":
+        X, y = make_moons(n_samples=280, noise=0.22, random_state=12)
+    elif dataset_name == "Concentric circles":
+        X, y = make_circles(
+            n_samples=280,
+            factor=0.45,
+            noise=0.08,
+            random_state=12,
+        )
+    elif dataset_name == "Anisotropic blobs":
+        X, y = make_blobs(
+            n_samples=280,
+            centers=[(-1.4, -1.0), (1.4, 1.0)],
+            cluster_std=0.7,
+            random_state=12,
+        )
+        X = X @ np.array([[1.9, -0.8], [0.2, 0.45]])
+    elif dataset_name == "Linear separation":
+        X, y = make_classification(
+            n_samples=280,
+            n_features=2,
+            n_informative=2,
+            n_redundant=0,
+            n_clusters_per_class=1,
+            class_sep=1.4,
+            flip_y=0.04,
+            random_state=12,
+        )
+    elif dataset_name == "Directional rays":
+        rng = np.random.default_rng(12)
+        n_per_class = 60
+        angles = np.concatenate(
+            [
+                rng.normal(np.deg2rad(25), np.deg2rad(2), n_per_class),
+                rng.normal(np.deg2rad(35), np.deg2rad(2), n_per_class),
+            ]
+        )
+        radii = np.exp(
+            rng.uniform(np.log(0.01), np.log(1000), 2 * n_per_class)
+        )
+        X = np.column_stack(
+            [
+                radii * np.cos(angles),
+                radii * np.sin(angles),
+            ]
+        )
+        y = np.repeat([0, 1], n_per_class)
+    else:
+        raise ValueError(f"Unknown dataset: {dataset_name}")
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.25,
+        random_state=21,
+        stratify=y,
+    )
+    return X_train, y_train, X_test, y_test
 
 
 DISTANCE_METRICS = {
@@ -26,6 +96,7 @@ DISTANCE_METRICS = {
     "Manhattan (L1)": {"metric": "manhattan"},
     "Chebyshev (L∞)": {"metric": "chebyshev"},
     "Minkowski (p = 3)": {"metric": "minkowski", "p": 3},
+    "Cosine": {"metric": "cosine"},
 }
 
 CLASS_COLORS = ["#E69F00", "#56B4E9"]
@@ -33,16 +104,19 @@ BACKGROUND_COLORS = ["#FFF4D6", "#E7F5FC"]
 
 
 def plot_decision_boundary(
-    X: np.ndarray,
-    y: np.ndarray,
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    X_test: np.ndarray,
+    y_test: np.ndarray,
     model: KNeighborsClassifier,
 ) -> plt.Figure:
-    """Plot the training points and the model's predicted regions."""
+    """Plot predicted regions, training points, and held-out test points."""
 
     x_padding = 0.45
     y_padding = 0.45
-    x_min, x_max = X[:, 0].min() - x_padding, X[:, 0].max() + x_padding
-    y_min, y_max = X[:, 1].min() - y_padding, X[:, 1].max() + y_padding
+    X_all = np.vstack([X_train, X_test])
+    x_min, x_max = X_all[:, 0].min() - x_padding, X_all[:, 0].max() + x_padding
+    y_min, y_max = X_all[:, 1].min() - y_padding, X_all[:, 1].max() + y_padding
 
     # A moderately dense grid keeps the boundary smooth without slowing the app.
     xx, yy = np.meshgrid(
@@ -71,15 +145,28 @@ def plot_decision_boundary(
     )
 
     for class_value, color in enumerate(CLASS_COLORS):
-        class_points = y == class_value
+        train_points = y_train == class_value
         ax.scatter(
-            X[class_points, 0],
-            X[class_points, 1],
+            X_train[train_points, 0],
+            X_train[train_points, 1],
             s=48,
             facecolors="white",
             edgecolors=color,
             linewidths=1.8,
-            label=f"Class {class_value}",
+            label=f"Class {class_value} training",
+            zorder=3,
+        )
+
+        test_points = y_test == class_value
+        ax.scatter(
+            X_test[test_points, 0],
+            X_test[test_points, 1],
+            s=62,
+            marker="^",
+            facecolors=color,
+            edgecolors="white",
+            linewidths=0.8,
+            label=f"Class {class_value} test",
             zorder=3,
         )
 
@@ -100,9 +187,16 @@ st.write(
     "change a k-nearest-neighbors classifier."
 )
 
-X, y = make_demo_data()
-
 with st.sidebar:
+    st.header("Data controls")
+    dataset_name = st.selectbox(
+        "Dataset",
+        options=list(DATASET_DESCRIPTIONS),
+        index=0,
+        help="Moons is the default; the alternatives highlight different metric behavior.",
+    )
+    st.caption(DATASET_DESCRIPTIONS[dataset_name])
+
     st.header("Model controls")
     k = st.slider(
         "Number of neighbors (k)",
@@ -124,6 +218,22 @@ with st.sidebar:
         options=list(DISTANCE_METRICS),
         index=0,
     )
+    standardize = st.toggle(
+        "Standardize features",
+        value=False,
+        help=(
+            "Subtract each feature's mean and divide by its standard deviation "
+            "before fitting. This prevents large-scale features from dominating "
+            "the distance calculation."
+        ),
+    )
+
+X_train, y_train, X_test, y_test = make_demo_data(dataset_name)
+
+if standardize:
+    scaler = StandardScaler().fit(X_train)
+    X_train = scaler.transform(X_train)
+    X_test = scaler.transform(X_test)
 
 weights = "distance" if weighted else "uniform"
 model = KNeighborsClassifier(
@@ -131,26 +241,30 @@ model = KNeighborsClassifier(
     weights=weights,
     **DISTANCE_METRICS[distance_name],
 )
-model.fit(X, y)
+model.fit(X_train, y_train)
 
 plot_column, summary_column = st.columns([3.2, 1])
 
 with plot_column:
-    figure = plot_decision_boundary(X, y, model)
-    st.pyplot(figure, clear_figure=True, use_container_width=True)
+    figure = plot_decision_boundary(X_train, y_train, X_test, y_test, model)
+    st.pyplot(figure, clear_figure=True, width="stretch")
 
 with summary_column:
     st.subheader("Current model")
     st.metric("k", k)
-    st.metric("Training accuracy", f"{model.score(X, y):.1%}")
+    st.metric("Training accuracy", f"{model.score(X_train, y_train):.1%}")
+    st.metric("Test accuracy", f"{model.score(X_test, y_test):.1%}")
     st.write(f"**Voting:** {'distance-weighted' if weighted else 'uniform'}")
     st.write(f"**Distance:** {distance_name}")
+    st.write(f"**Features:** {'standardized' if standardize else 'original scale'}")
     st.info(
         "The colored background shows the class predicted at each location. "
-        "The dark curve is the approximate decision boundary."
+        "The dark curve is the approximate decision boundary. Triangles are "
+        "held-out test points; circles are training points."
     )
 
 st.caption(
-    "This demonstration uses a fixed two-dimensional synthetic data set so that "
-    "the effect of each control is easy to see."
+    "This demonstration uses a fixed two-dimensional synthetic data set with a "
+    "held-out test split. Moons is the default; use the dataset selector to "
+    "compare alternative geometries."
 )
